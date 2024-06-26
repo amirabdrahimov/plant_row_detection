@@ -33,7 +33,8 @@ def get_highest_iou_anchor(anchors, gt_box):
     widths = np.minimum(anchors[:, -1], gt_box[3])
 
     if np.count_nonzero(heights == 0) > 0 or np.count_nonzero(widths == 0) > 0:
-        raise ValueError('The given box has no area!')
+        return 0
+        #raise ValueError('The given box has no area!')
 
     #since the height and width of the boxes have the same origin, we can calculate the intersection simply by multiplying them.
     intersection_area = heights*widths
@@ -61,7 +62,7 @@ def get_highest_iou_anchor(anchors, gt_box):
 
 
 
-def label_formatting(gt_class_labels, gt_boxes, anchors_list, subsampled_ratio, resized_image_size):
+def label_formatting(gt_boxes, anchors_list, subsampled_ratio, resized_image_size):
     '''
     Formats the given labels from the xml file into YOLO's format as explained above.
     '''
@@ -71,14 +72,12 @@ def label_formatting(gt_class_labels, gt_boxes, anchors_list, subsampled_ratio, 
     #this array will be used to store the ground truth probability of objectness,  offset calculations between the responsible anchors
     #and the ground-truth boxes and the class of the object. The class of the object will just be an integer since PyTorch's cross entropy
     #will convert it into one hot label for us.
-    label_array = np.zeros((subsampled_size, subsampled_size, anchors_list.shape[-2], 6), dtype=np.float32)
+    label_array = np.zeros((subsampled_size, subsampled_size, anchors_list.shape[-2], 5), dtype=np.float32)
 
 
 
     #An image can contain more than 1 objects.
     for i in range(gt_boxes.shape[0]):
-
-        class_label_index = gt_class_labels[i] #extract the class index
 
         #extract the coordinate of the ground truth box. This ground-truth box's format is [x1,y1,x2,y2]
 
@@ -89,7 +88,7 @@ def label_formatting(gt_class_labels, gt_boxes, anchors_list, subsampled_ratio, 
 
         #transform the ground truth values to [x,y,w,h] (center coordinates, width and height)
         gt_box_height = gt_box_y2 - gt_box_y1
-        gt_box_width = gt_box_x2 - gt_box_x1
+        gt_box_width = np.abs(gt_box_x2 - gt_box_x1)
         gt_center_x = gt_box_x1 + (gt_box_width/2)
         gt_center_y = gt_box_y1 + (gt_box_height/2)
 
@@ -121,7 +120,7 @@ def label_formatting(gt_class_labels, gt_boxes, anchors_list, subsampled_ratio, 
         t_h = math.log(gt_box_height/chosen_anchor[4])
 
         #objectness probability + regression values + class index
-        label_values = np.asarray([1.0, sigmoid_tx, sigmoid_ty, t_w, t_h, class_label_index], dtype=np.float32)
+        label_values = np.asarray([1.0, sigmoid_tx, sigmoid_ty, t_w, t_h], dtype=np.float32)
 
         #We need to occupy the probability of objnectness and the regression values in the chosen anchor's index.
         label_array[responsible_grid[0]][responsible_grid[1]][chosen_anchor_index][:] = label_values

@@ -43,7 +43,7 @@ class LoadDataset(Dataset):
     Wraps the loading of the dataset in PyTorch's DataLoader module.
     '''
 
-    def __init__(self, resized_image_size, k=cfg.K, classes=cfg.CLASSES.copy(), list_images=cfg.LIST_IMAGES.copy(), list_annotations=cfg.LIST_ANNOTATIONS.copy(),
+    def __init__(self, resized_image_size, k=cfg.K, list_images=cfg.LIST_IMAGES.copy(), list_annotations=cfg.LIST_ANNOTATIONS.copy(),
                  total_images=cfg.TOTAL_IMAGES, subsampled_ratio=cfg.SUBSAMPLED_RATIO, detection_conv_size=cfg.DETECTION_CONV_SIZE,
                  excluded_classes=cfg.EXCLUDED_CLASSES.copy(), anchor_box_write=cfg.ANCHOR_BOXES_STORE, transform=None):
 
@@ -52,7 +52,7 @@ class LoadDataset(Dataset):
         '''
 
         self.resized_image_size = resized_image_size
-        self.classes = classes
+        #self.classes = classes
         self.list_images = list_images
         self.list_annotations = list_annotations
         self.total_images = total_images
@@ -65,7 +65,7 @@ class LoadDataset(Dataset):
 
         #get the top-k anchor sizes using modifed K-Means clustering.
         self.anchor_sizes = cluster_bounding_boxes(k=self.k, total_images=self.total_images, resized_image_size=self.resized_image_size,
-                                                   list_annotations=cfg.LIST_ANNOTATIONS, classes=cfg.CLASSES, excluded_classes=cfg.EXCLUDED_CLASSES)
+                                                   list_annotations=cfg.LIST_ANNOTATIONS)
 
         #python dbm to store the anchor sizes for a specific training set for every image size.
         #the anchor sizes are necessary for the use of evaluation later as we would not have training data to perform clustering.
@@ -76,6 +76,7 @@ class LoadDataset(Dataset):
 
         self.anchors_list = generate_anchors(anchor_sizes=self.anchor_sizes,
                                              subsampled_ratio=self.subsampled_ratio, resized_image_size=self.resized_image_size)
+        
 
 
 
@@ -96,8 +97,8 @@ class LoadDataset(Dataset):
 
 
         image, label_array = generate_training_data(anchors_list=self.anchors_list,
-                                        xml_file_path=self.list_annotations[idx], classes=self.classes, resized_image_size=self.resized_image_size,
-                                    subsampled_ratio=self.subsampled_ratio, excluded_classes=self.excluded_classes, image_path=self.list_images[idx])
+                                        xml_file_path=self.list_annotations[idx], resized_image_size=self.resized_image_size,
+                                    subsampled_ratio=self.subsampled_ratio, image_path=self.list_images[idx])
 
         sample = {'image':image,
                  'label':label_array}

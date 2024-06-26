@@ -61,7 +61,7 @@ class Darknet19(NN.Module):
                     layers += [conv2d, NN.MaxPool2d(kernel_size=7)]
                     break
 
-                layers += [conv2d, NN.BatchNorm2d(num_features=lyr[1]), NN.LeakyReLU(inplace=True)]
+                layers += [conv2d, NN.BatchNorm2d(num_features=lyr[1]), NN.LeakyReLU(inplace=False)]
                 in_channels = lyr[1]
 
         self.classification = NN.Sequential(*layers)

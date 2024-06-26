@@ -25,7 +25,7 @@ class YOLOv2(NN.Module):
                 NN.init.constant_(mod.weight, 1)
                 NN.init.constant_(mod.bias, 0.5)
 
-    def __init__(self, k, num_classes, init_weights=True):
+    def __init__(self, k, num_classes=1, init_weights=True):
 
         self.k = k
         self.num_classes = num_classes
@@ -36,7 +36,7 @@ class YOLOv2(NN.Module):
         self.cfgs = {
             'yolo':[(3, 32), 'M', (3, 64), 'M', (3, 128), (1, 64), (3, 128), 'M', (3, 256), (1, 128), (3, 256), 'M', (3, 512),
                     (1, 256), (3, 256), (1, 256), (3, 512), 'M', (3, 1024), (1, 512), (3, 1024), (1, 512), (3, 1024), (3, 1024), (3, 1024), (3, 1024),
-                    (cfg.DETECTION_CONV_SIZE, self.k*(self.num_classes+5))]
+                    (cfg.DETECTION_CONV_SIZE, self.k*(5))]
         }
 
         layers = []
@@ -55,11 +55,11 @@ class YOLOv2(NN.Module):
                 conv2d = NN.Conv2d(in_channels, lyr[1], kernel_size=lyr[0], padding=padding_value)
 
                 #for the last convolution layer. No activation function. No Batch Norm.
-                if lyr[1] == k*(num_classes+5):
+                if lyr[1] == k*(num_classes):
                     layers += [conv2d]
                     break
 
-                layers += [conv2d, NN.BatchNorm2d(num_features=lyr[1]), NN.LeakyReLU(inplace=True)]
+                layers += [conv2d, NN.BatchNorm2d(num_features=lyr[1]), NN.LeakyReLU(inplace=False)]
                 in_channels = lyr[1]
 
         self.features = NN.Sequential(*layers)
@@ -77,8 +77,7 @@ class YOLOv2(NN.Module):
 
         x = torch.transpose(x, 1, -1)
         #reshape the output into [batch size, feature map width, feature map height, number of anchors, 5 + number of classes]
-        x = x.view(-1, subsampled_feature_size, subsampled_feature_size, self.k, 5+self.num_classes)
-
+        x = x.view(-1, subsampled_feature_size, subsampled_feature_size, self.k, 5)              
         x = activate(x)
 
         return x
@@ -110,6 +109,8 @@ def loss(predicted_array, label_array):
     predicted_center_y = predicted_array[:, :, :, :, 2:3]
     gt_center_x = label_array[:, :, :, :, 1:2]
     gt_center_y = label_array[:, :, :, :,2:3]
+    # print(f"predicted_center_x: {torch.sum(predicted_center_x)}")
+    # print(f"gt_center_x: {torch.sum(gt_center_x)}")
 
     center_loss = cfg.LAMBDA_COORD * torch.sum(gt_objectness * ((predicted_center_x - gt_center_x)**2 + (gt_center_y - predicted_center_y)**2))
 
@@ -135,26 +136,26 @@ def loss(predicted_array, label_array):
     wrong_objectness_loss = cfg.LAMBDA_NOOBJ * torch.sum(gt_no_objectness*(gt_objectness - predicted_objectness)**2)
 
     #get the predicted probability of the classes and the ground truth class probabilities.
-    predicted_classes = gt_objectness * predicted_array[:, :, :, :, 5:] #zeroes the arrays that does not contain object!
+    #predicted_classes = gt_objectness * predicted_array[:, :, :, :, 5:] #zeroes the arrays that does not contain object!
 
     #cross entropy requires the format of (N,C,d1,d2,...dk) where N : batch size, C: class size, and di are other dimensions for the predicted vectors.
     #as for the target, it requires the format of (N, d1,d2,..,dk) and the values are from 0 to number of classes (Scalar values).
-    predicted_classes = predicted_classes.contiguous().transpose(1, -1).transpose(-3, -2)
-    gt_classes = label_array[:, :, :, :, 5].type(torch.long).contiguous().transpose(1, -1)
+    # predicted_classes = predicted_classes.contiguous().transpose(1, -1).transpose(-3, -2)
+    # gt_classes = label_array[:, :, :, :, 5].type(torch.long).contiguous().transpose(1, -1)
 
-    #cross-entropy loss between the predicted and label and sum all the losses.
-    classification_loss = NN.CrossEntropyLoss(reduction="mean")(target=gt_classes, input=predicted_classes)
+    # #cross-entropy loss between the predicted and label and sum all the losses.
+    # classification_loss = NN.CrossEntropyLoss(reduction="mean")(target=gt_classes, input=predicted_classes)
 
     #sum all the losses together
-    total_loss = center_loss + size_loss + objectness_loss + wrong_objectness_loss + classification_loss
+    #total_loss = center_loss + size_loss + objectness_loss + wrong_objectness_loss + classification_loss
 
-    return total_loss
-
-
+    return center_loss, size_loss, objectness_loss, wrong_objectness_loss
 
 
 
-YOLO = YOLOv2(k=cfg.K, num_classes=cfg.NUM_OF_CLASS, init_weights=True)
+
+
+YOLO = YOLOv2(k=cfg.K, init_weights=True)
 
 OPTIMIZER = Adam(YOLO.parameters(), lr=cfg.LEARNING_RATE, weight_decay=5e-5)
 LR_DECAY = lr_scheduler.ExponentialLR(OPTIMIZER, gamma=cfg.LEARNING_RATE_DECAY)

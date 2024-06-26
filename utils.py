@@ -4,6 +4,7 @@ Helper functions to beused throughout the entire program.
 import glob
 import os.path
 import xmltodict
+import json
 import numpy as np
 import cv2
 import torch
@@ -103,31 +104,14 @@ def create_test_lists(data_images_path):
     return image_paths
 
 
-
-def create_training_lists(data_images_path, data_annotation_path, excluded_classes, resized_image_size):
+def create_training_lists(data_images_path, data_annotation_path, resized_image_size):
     '''
     Get the path of the images and the corresponding xml files. Also filters the data with unwanted classes.
     '''
     image_paths = sorted([x for x in glob.glob(data_images_path + '/**')])
     list_annotations = sorted([x for x in glob.glob(data_annotation_path + '/**')])
 
-    all_classes = get_classes(xml_files=list_annotations)
-
-    new_image_paths, new_list_annotations = [], []
-    for annotation, img_path in zip(list_annotations, image_paths):
-
-        class_label, _ = get_labels_from_xml(xml_file_path=annotation, classes=all_classes, resized_image_size=resized_image_size,
-                                             excluded_classes=excluded_classes)
-
-        if len(class_label) == 0:
-            continue
-
-        new_image_paths.append(img_path)
-        new_list_annotations.append(annotation)
-
-
-
-    return new_image_paths, new_list_annotations, all_classes
+    return image_paths, list_annotations
 
 
 
@@ -161,7 +145,39 @@ def get_classes(xml_files):
     #returns a list containing the names of classes after being sorted.
     return classes
 
+def get_labels_from_json(json_file_path, resized_image_size):
+    # Opening JSON file
+    f = open(json_file_path)
+    data = json.load(f)
+    f.close()
 
+    ori_img_height = data['height']
+    ori_img_width = data['width']
+
+    bbox_label = []
+    for i in range(data['nb_of_plants_rows']):
+        #print(data[f'row_{i}']['xmin'])
+        x_min = data[f'row_{i}']['xmin']
+        y_min = data[f'row_{i}']['ymin']
+        x_max = data[f'row_{i}']['xmax']
+        y_max = data[f'row_{i}']['ymax']
+        
+        if x_min > x_max:
+            x_min, x_max = x_max, x_min
+            
+        #In order to find the resized coordinates, we must multiply the ratio of the resized image compared to its original to the coordinates.
+        x_min = float((resized_image_size/ori_img_width)*x_min)
+        y_min = float((resized_image_size/ori_img_height)*y_min)
+        x_max = float((resized_image_size/ori_img_width)*x_max)
+        y_max = float((resized_image_size/ori_img_height)*y_max)
+
+        generated_box_info = [x_min, y_min, x_max, y_max]
+
+        #append each object's class label and the bounding box label (converted to Faster R-CNN format) into the list initialized earlier.
+        bbox_label.append(np.asarray(generated_box_info, dtype='float32'))
+
+
+    return np.asarray(bbox_label)
 
 
 def get_labels_from_xml(xml_file_path, classes, resized_image_size, excluded_classes):
@@ -259,7 +275,7 @@ def get_labels_from_xml(xml_file_path, classes, resized_image_size, excluded_cla
 
 
 
-def cluster_bounding_boxes(k, total_images, resized_image_size, list_annotations, classes, excluded_classes):
+def cluster_bounding_boxes(k, total_images, resized_image_size, list_annotations):
     '''
     Use modified K-Means algorithm to find the best k anchor box sizes.
     '''
@@ -269,8 +285,10 @@ def cluster_bounding_boxes(k, total_images, resized_image_size, list_annotations
     for i in range(total_images):
 
         #extract the class label (unecessary) and ground-truth boxes for the specific image.
-        _, gt_boxes = get_labels_from_xml(xml_file_path=list_annotations[i], classes=classes,
-                                          resized_image_size=resized_image_size, excluded_classes=excluded_classes)
+        # _, gt_boxes = get_labels_from_xml(xml_file_path=list_annotations[i], classes=classes,
+        #                                   resized_image_size=resized_image_size, excluded_classes=excluded_classes)
+        gt_boxes = get_labels_from_json(json_file_path=list_annotations[i],
+                                          resized_image_size=resized_image_size)
 
         #in order to treat each bounding box as one data point, we have to extract every bounding box from the label files.
         #some images only contain 1 object whereas other images contain more than 1 objects.
@@ -340,19 +358,24 @@ def generate_test_data(resized_image_size, image_path):
     return image_array
 
 
-def generate_training_data(anchors_list, xml_file_path, classes, resized_image_size, subsampled_ratio, excluded_classes, image_path):
+def generate_training_data(anchors_list, xml_file_path, resized_image_size, subsampled_ratio, image_path):
     '''
     Returns the image array and the corresponding label in the required format based for the given index.
     '''
 
     #get the label(s) and ground-truth bounding box(es) (x1,y1,x2,y2) for a given xml file path.
-    object_labels, gt_boxes = get_labels_from_xml(xml_file_path=xml_file_path, resized_image_size=resized_image_size,
-                                                  classes=classes, excluded_classes=excluded_classes)
+    # object_labels, gt_boxes = get_labels_from_xml(xml_file_path=xml_file_path, resized_image_size=resized_image_size,
+    #                                               classes=classes, excluded_classes=excluded_classes)
+    
+    gt_boxes = get_labels_from_json(json_file_path=xml_file_path,
+                                    resized_image_size=resized_image_size)
+    
 
     image_array = read_image(image_path=image_path, resized_image_size=resized_image_size)
 
     #label formatting
-    label_array = label_formatting(gt_class_labels=object_labels, gt_boxes=gt_boxes, anchors_list=anchors_list,
+    #print(gt_boxes)
+    label_array = label_formatting(gt_boxes=gt_boxes, anchors_list=anchors_list,
                                    subsampled_ratio=subsampled_ratio, resized_image_size=resized_image_size)
 
 

@@ -52,7 +52,7 @@ class PostProcess:
     '''
 
     def __init__(self, box_num_per_grid, feature_size, anchors_list, iou_thresh=cfg.MAP_IOU_THRESH, confidence_thresh=cfg.CONFIDENCE_THRESH,
-                 subsampled_ratio=cfg.SUBSAMPLED_RATIO, num_class=cfg.NUM_OF_CLASS, nms_iou_thresh=cfg.NMS_IOU_THRESH):
+                 subsampled_ratio=cfg.SUBSAMPLED_RATIO, nms_iou_thresh=cfg.NMS_IOU_THRESH):
         '''
         Initialize parameters.
         '''
@@ -66,7 +66,6 @@ class PostProcess:
         self.nms_iou_thres = nms_iou_thresh
         self.epoch_predboxes = []
         self.epoch_gtboxes = []
-        self.num_class = num_class
 
     def collect(self, network_output, ground_truth, suppressed=True):
         '''
@@ -288,12 +287,12 @@ class PostProcess:
 
         #THE PREDICTION ARRAY IS TO BE RESHAPED TO [BATCH_SIZE, TOTAL_PREDICTION_BOXES, 5+NUM_CLASS]. ONCE THE RESHAPING IS DONE, THE ARRAY
         #WILL BE THEN SORTED ACCORDING TO THE CONFIDENCE VALUES WHICH IS LOCATED IN [:,:,0] THE FIRST INDEX IN THE THIRD AXIS.
-        reshaped_pred = cvt_arrays.view(-1, num_predictions, 5+self.num_class)
+        reshaped_pred = cvt_arrays.view(-1, num_predictions, 5)
 
 
         #convert the one-hot vector of the class label into the index of the class.
-        reshaped_pred[:, :, 5] = torch.argmax(reshaped_pred[:, :, 5:], dim=-1)
-        reshaped_pred = reshaped_pred[:, :, :6]
+        # reshaped_pred[:, :, 5] = torch.argmax(reshaped_pred[:, :, 5:], dim=-1)
+        # reshaped_pred = reshaped_pred[:, :, :6]
 
 
 
@@ -315,12 +314,12 @@ class PostProcess:
         for i in range(num_predictions-1): #-1 since the last prediction has nothing to be compared to.
 
             ref_pred = sorted_pred[:, i:i+1].clone() # i+1 is to retain the dimensions.
-            ref_class = sorted_pred[:, i:i+1, 5:6].clone()
+            #ref_class = sorted_pred[:, i:i+1, 5:6].clone()
 
             comparing_arrays = sorted_pred[:, i+1:].clone() #make a copy of the arrays that we'll be comparing our reference pred to.
 
             #whichever prediction that does not belong to the same class as the reference pred array will be zeroed out.
-            comparing_arrays = torch.where(comparing_arrays[:, :, 5:6] == ref_class, comparing_arrays, torch.Tensor([0.]).to(cfg.DEVICE))
+            #comparing_arrays = torch.where(comparing_arrays[:, :, 5:6] == ref_class, comparing_arrays, torch.Tensor([0.]).to(cfg.DEVICE))
 
             #get the iou between the reference pred array and all other remaining arrays on the right.
             iou_batch = nms_iou_check(box_a=ref_pred, box_b=comparing_arrays, device=cfg.DEVICE)

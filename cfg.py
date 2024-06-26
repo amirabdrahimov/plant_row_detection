@@ -20,10 +20,10 @@ IMGNET_BATCH_SIZE = 50
 IMGNET_IMAGE_SIZE = 224
 ###
 
-
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-DATA_IMAGES_PATH = '../VOCdevkit/VOC2012/JPEGImages'
-DATA_ANNOTATION_PATH = '../VOCdevkit/VOC2012/Annotations'
+#"mps" if torch.backends.mps.is_built() else 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DATA_IMAGES_PATH = '../BINARY_PLANTS/images'
+DATA_ANNOTATION_PATH = '../BINARY_PLANTS/labels'
 TRAINED_MODEL_PATH_FOLDER = './yolo_model/'
 TRAINED_MODEL_NAME = 'yolo.pth'
 TEST_FOLDER_PATH = './test_images/'
@@ -35,13 +35,13 @@ TEST_IMAGE_SIZE = 448
 IMAGE_DEPTH = 3
 DETECTION_CONV_SIZE = 3
 SUBSAMPLED_RATIO = 32
-K = 5 #number of anchor box in a grid
-LEARNING_RATE = 1e-5
+K = 12 #number of anchor box in a grid
+LEARNING_RATE = 1e-4
 LEARNING_RATE_DECAY = 0.999
 LAMBDA_COORD = 5
 LAMBDA_NOOBJ = 0.5
-TOTAL_EPOCH = 1000
-MAP_IOU_THRESH = 0.5
+TOTAL_EPOCH = 100
+MAP_IOU_THRESH = 0.3
 CONFIDENCE_THRESH = 0.8
 BATCH_SIZE = 5
 NMS_IOU_THRESH = 0.75
@@ -52,17 +52,17 @@ EXCLUDED_CLASSES = ['horse', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 
 
 #Get the image and annotation file paths
 #resized image size does not affect anything since we're just using it to filter the unwanted classes.
-LIST_IMAGES, LIST_ANNOTATIONS, ALL_CLASSES = create_training_lists(data_images_path=DATA_IMAGES_PATH, data_annotation_path=DATA_ANNOTATION_PATH,
-                                                                   excluded_classes=EXCLUDED_CLASSES, resized_image_size=IMAGE_SIZES[0])
+LIST_IMAGES, LIST_ANNOTATIONS = create_training_lists(data_images_path=DATA_IMAGES_PATH, data_annotation_path=DATA_ANNOTATION_PATH,
+                                                                    resized_image_size=IMAGE_SIZES[0])
 
 TEST_IMAGE_LIST = create_test_lists(TEST_FOLDER_PATH)
 
 #get the classes for all the training data.
-CLASSES = sorted([x for x in ALL_CLASSES if not x in EXCLUDED_CLASSES])
+#CLASSES = sorted([x for x in ALL_CLASSES if not x in EXCLUDED_CLASSES])
 
 
 TOTAL_IMAGES = len(LIST_IMAGES)
-NUM_OF_CLASS = len(CLASSES)
+# NUM_OF_CLASS = len(CLASSES)
 
 #create the directories if they don't exist.
 if not os.path.exists(IMGNET_MODEL_SAVE_PATH_FOLDER):
@@ -78,4 +78,5 @@ if not os.path.exists(TEST_FOLDER_PATH):
     os.makedirs(TEST_FOLDER_PATH)
 
 if not os.path.exists(ANCHOR_BOXES_STORE):
-    os.mknod(ANCHOR_BOXES_STORE)
+    #os.makedirs(ANCHOR_BOXES_STORE)
+    open(ANCHOR_BOXES_STORE, 'w')

@@ -33,12 +33,12 @@ except KeyError:
     sys.exit()
 
 
-DATALOADER = DataLoader(TEST_DATA, batch_size=cfg.BATCH_SIZE, shuffle=False, num_workers=4)
+DATALOADER = DataLoader(TEST_DATA, batch_size=cfg.BATCH_SIZE, shuffle=False)
 POST_PROCESSING = PostProcess(box_num_per_grid=cfg.K, feature_size=cfg.TEST_IMAGE_SIZE//cfg.SUBSAMPLED_RATIO, anchors_list=TEST_DATA.anchors_list)
 
 for i, sample in tqdm(enumerate(DATALOADER)):
 
-    batch_x = sample['image'].cuda()
+    batch_x = sample['image'].to(cfg.DEVICE) #.cuda()
 
     outputs = YOLO(batch_x)
 

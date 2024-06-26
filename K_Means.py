@@ -38,7 +38,8 @@ class K_Means:
         y = np.minimum(centroids[:, 1], box[1])
         
         if np.count_nonzero(x == 0) > 0 or np.count_nonzero(y == 0) > 0:
-            raise ValueError("The given box has no area!")
+            #raise ValueError("The given box has no area!")
+            return 0
         
         intersection_area = x * y
         box_area = box[0] * box[1]
